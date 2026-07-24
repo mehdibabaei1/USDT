@@ -1,0 +1,136 @@
+"""
+ربات قیمت لحظه‌ای تتر (USDT) - نسخه GitHub Actions
+-----------------------------------------------------
+این نسخه یک بار اجرا می‌شود و خارج می‌شود (بر خلاف نسخه قبلی که حلقه بی‌نهایت
+داشت). GitHub Actions هر چند دقیقه یک‌بار خودش این اسکریپت را اجرا می‌کند،
+پس نیازی به حلقه/sleep نیست.
+
+مقادیر حساس (توکن بات، آیدی کانال، API Key آبان‌تتر) از GitHub Secrets
+به‌صورت Environment Variable خوانده می‌شوند - هرگز داخل کد نوشته نمی‌شوند.
+"""
+
+import os
+import sys
+import logging
+from datetime import datetime
+
+import requests
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger("tether-bot")
+
+REQUEST_TIMEOUT = 10
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHANNEL_ID = os.environ.get("CHANNEL_ID")
+ABANTETHER_API_KEY = os.environ.get("ABANTETHER_API_KEY", "")
+
+
+def fetch_wallex():
+    try:
+        r = requests.get("https://api.wallex.ir/v1/markets", timeout=REQUEST_TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        stats = data["result"]["symbols"]["USDTTMN"]["stats"]
+        buy_price = round(float(stats["askPrice"]))
+        sell_price = round(float(stats["bidPrice"]))
+        return buy_price, sell_price
+    except Exception as e:
+        log.warning("Wallex fetch failed: %s", e)
+        return None, None
+
+
+def fetch_nobitex():
+    try:
+        r = requests.post(
+            "https://api.nobitex.ir/market/stats",
+            data={"srcCurrency": "usdt", "dstCurrency": "rls"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        data = r.json()
+        stats = data["stats"]["usdt-rls"]
+        buy_price = round(float(stats["bestSell"]) / 10)
+        sell_price = round(float(stats["bestBuy"]) / 10)
+        return buy_price, sell_price
+    except Exception as e:
+        log.warning("Nobitex fetch failed: %s", e)
+        return None, None
+
+
+def fetch_abantether():
+    if not ABANTETHER_API_KEY:
+        return None, None
+    try:
+        r = requests.get(
+            "https://abantether.com/api/v1/otc/coin-price/",
+            params={"coin": "USDT"},
+            headers={"Authorization": f"Token {ABANTETHER_API_KEY}"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        data = r.json()
+        usdt = data["USDT"]
+        buy_price = round(float(usdt["irtPriceBuy"]))
+        sell_price = round(float(usdt["irtPriceSell"]))
+        return buy_price, sell_price
+    except Exception as e:
+        log.warning("AbanTether fetch failed: %s", e)
+        return None, None
+
+
+def fmt(n):
+    if n is None:
+        return "N/A"
+    return f"{n:,}"
+
+
+def build_message(rows):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = []
+    lines.append("قیمت لحظه‌ای تتر (USDT)")
+    lines.append("✨ USDT/TMN Price ✨")
+    lines.append("```")
+    lines.append(f"{'Market':<10}| {'Buy Price':>12} | {'Sell Price':>12}")
+    lines.append("-" * 40)
+    for name, (buy, sell) in rows.items():
+        lines.append(f"{name:<10}| {fmt(buy):>12} | {fmt(sell):>12}")
+    lines.append("```")
+    lines.append(f"🕒 Update: {now}")
+    return "\n".join(lines)
+
+
+def send_to_telegram(text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHANNEL_ID,
+        "text": text,
+        "parse_mode": "Markdown",
+    }
+    r = requests.post(url, data=payload, timeout=REQUEST_TIMEOUT)
+    if r.status_code != 200:
+        log.error("Telegram send failed: %s - %s", r.status_code, r.text)
+        sys.exit(1)
+    log.info("Message sent to Telegram.")
+
+
+def main():
+    if not BOT_TOKEN or not CHANNEL_ID:
+        log.error("BOT_TOKEN or CHANNEL_ID environment variable is missing.")
+        sys.exit(1)
+
+    rows = {
+        "Wallex": fetch_wallex(),
+        "Nobitex": fetch_nobitex(),
+        "AbanTether": fetch_abantether(),
+    }
+    message = build_message(rows)
+    log.info("\n%s", message)
+    send_to_telegram(message)
+
+
+if __name__ == "__main__":
+    main()
