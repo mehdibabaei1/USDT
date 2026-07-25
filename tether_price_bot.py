@@ -88,7 +88,7 @@ def fetch_bitpin():
     بهترین قیمت خریداران (bids) = قیمت فروش کاربر."""
     try:
         r = requests.get(
-            "https://api.bitpin.ir/v1/mth/orderbook/USDT_IRT/",
+            "https://api.bitpin.ir/api/v1/mth/orderbook/USDT_IRT/",
             timeout=REQUEST_TIMEOUT,
         )
         r.raise_for_status()
