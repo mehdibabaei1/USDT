@@ -68,7 +68,7 @@ def fetch_abantether():
         r = requests.get(
             "https://abantether.com/api/v1/otc/coin-price/",
             params={"coin": "USDT"},
-            headers={"Authorization": f"Token {ABANTETHER_API_KEY}"},
+            headers={"Authorization": f"Bearer {ABANTETHER_API_KEY}"},
             timeout=REQUEST_TIMEOUT,
         )
         r.raise_for_status()
