@@ -21,6 +21,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Debug AbanTether response
+        env:
+          ABANTETHER_API_KEY: ${{ secrets.ABANTETHER_API_KEY }}
+        run: |
+          curl -v -L "https://abantether.com/api/v1/otc/coin-price/?coin=USDT" \
+            -H "Authorization: Bearer $ABANTETHER_API_KEY" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+            || true
+
       - name: Run bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
