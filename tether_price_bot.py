@@ -82,6 +82,43 @@ def fetch_abantether():
         return None, None
 
 
+def fetch_bitpin():
+    """قیمت خرید/فروش USDT/IRT از بیت‌پین (API عمومی، بدون نیاز به کلید).
+    از اردربوک عمومی استفاده می‌شود: بهترین قیمت فروشنده‌ها (asks) = قیمت خرید کاربر،
+    بهترین قیمت خریداران (bids) = قیمت فروش کاربر."""
+    try:
+        r = requests.get(
+            "https://api.bitpin.ir/v1/mth/orderbook/USDT_IRT/",
+            timeout=REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        data = r.json()
+        buy_price = round(float(data["asks"][0][0]))
+        sell_price = round(float(data["bids"][0][0]))
+        return buy_price, sell_price
+    except Exception as e:
+        log.warning("Bitpin fetch failed: %s", e)
+        return None, None
+
+
+def fetch_tabdeal():
+    """قیمت خرید/فروش USDT/IRT از تبدیل (API عمومی، بدون نیاز به کلید)."""
+    try:
+        r = requests.get(
+            "https://api1.tabdeal.org/api/v1/depth",
+            params={"symbol": "USDTIRT"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        data = r.json()
+        buy_price = round(float(data["asks"][0][0]))
+        sell_price = round(float(data["bids"][0][0]))
+        return buy_price, sell_price
+    except Exception as e:
+        log.warning("Tabdeal fetch failed: %s", e)
+        return None, None
+
+
 def fmt(n):
     if n is None:
         return "N/A"
@@ -126,6 +163,8 @@ def main():
         "Wallex": fetch_wallex(),
         "Nobitex": fetch_nobitex(),
         "AbanTether": fetch_abantether(),
+        "Bitpin": fetch_bitpin(),
+        "Tabdeal": fetch_tabdeal(),
     }
     message = build_message(rows)
     log.info("\n%s", message)
