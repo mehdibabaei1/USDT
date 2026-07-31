@@ -147,6 +147,8 @@ def fetch_ramzinex():
             sample = pairs[0] if pairs else "EMPTY LIST"
             raise ValueError(f"USDT/TMN pair not found. Total pairs: {len(pairs)}. Sample entry keys/values: {sample}")
 
+        log.info("Ramzinex matched pair (for verification): %s", usdt_pair)
+
         buy_price = round(float(usdt_pair["sell"]))
         sell_price = round(float(usdt_pair["buy"]))
         return buy_price, sell_price
