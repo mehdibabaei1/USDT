@@ -121,8 +121,7 @@ def fetch_tabdeal():
 
 def fetch_ramzinex():
     """قیمت خرید/فروش USDT/IRT از رمزینکس (API عمومی، بدون نیاز به کلید).
-    نکته: این اندپوینت بر اساس مستندات غیررسمی نوشته شده، ممکن است نیاز به
-    اصلاح نام فیلد یا مسیر داشته باشد - در صورت خطا لاگ را بفرستید."""
+    نکته: این اندپوینت بر اساس مستندات غیررسمی نوشته شده - در صورت خطا لاگ را بفرستید."""
     try:
         r = requests.get(
             "https://ramzinex.com/exchange/api/v1.0/exchange/pairs",
@@ -131,14 +130,23 @@ def fetch_ramzinex():
         r.raise_for_status()
         data = r.json()
         pairs = data.get("data", data) if isinstance(data, dict) else data
+        if not isinstance(pairs, list):
+            raise ValueError(f"Unexpected response shape (not a list): {type(pairs)}; top-level keys: {list(data.keys()) if isinstance(data, dict) else 'n/a'}")
+
         usdt_pair = None
         for p in pairs:
-            url_name = str(p.get("url_name", "")).lower()
-            if "usdt" in url_name and ("tmn" in url_name or "toman" in url_name or "irt" in url_name):
+            if not isinstance(p, dict):
+                continue
+            # جستجو در تمام مقادیر رشته‌ای دیکشنری برای usdt و tmn/toman/irt
+            values_str = " ".join(str(v).lower() for v in p.values())
+            if "usdt" in values_str and ("tmn" in values_str or "toman" in values_str or "irt" in values_str or "-2" in values_str):
                 usdt_pair = p
                 break
+
         if not usdt_pair:
-            raise ValueError("USDT/TMN pair not found in Ramzinex pairs list")
+            sample = pairs[0] if pairs else "EMPTY LIST"
+            raise ValueError(f"USDT/TMN pair not found. Total pairs: {len(pairs)}. Sample entry keys/values: {sample}")
+
         buy_price = round(float(usdt_pair["sell"]))
         sell_price = round(float(usdt_pair["buy"]))
         return buy_price, sell_price
