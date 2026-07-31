@@ -119,6 +119,34 @@ def fetch_tabdeal():
         return None, None
 
 
+def fetch_ramzinex():
+    """قیمت خرید/فروش USDT/IRT از رمزینکس (API عمومی، بدون نیاز به کلید).
+    نکته: این اندپوینت بر اساس مستندات غیررسمی نوشته شده، ممکن است نیاز به
+    اصلاح نام فیلد یا مسیر داشته باشد - در صورت خطا لاگ را بفرستید."""
+    try:
+        r = requests.get(
+            "https://ramzinex.com/exchange/api/v1.0/exchange/pairs",
+            timeout=REQUEST_TIMEOUT,
+        )
+        r.raise_for_status()
+        data = r.json()
+        pairs = data.get("data", data) if isinstance(data, dict) else data
+        usdt_pair = None
+        for p in pairs:
+            url_name = str(p.get("url_name", "")).lower()
+            if "usdt" in url_name and ("tmn" in url_name or "toman" in url_name or "irt" in url_name):
+                usdt_pair = p
+                break
+        if not usdt_pair:
+            raise ValueError("USDT/TMN pair not found in Ramzinex pairs list")
+        buy_price = round(float(usdt_pair["sell"]))
+        sell_price = round(float(usdt_pair["buy"]))
+        return buy_price, sell_price
+    except Exception as e:
+        log.warning("Ramzinex fetch failed: %s", e)
+        return None, None
+
+
 def fmt(n):
     if n is None:
         return "N/A"
@@ -129,14 +157,14 @@ def build_message(rows):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = []
     lines.append("قیمت لحظه‌ای تتر (USDT)")
-    lines.append("✨ USDT/TMN Price ✨")
+    lines.append("✨ USDT/TMN ✨")
     lines.append("```")
-    lines.append(f"{'Market':<10}| {'Buy Price':>12} | {'Sell Price':>12}")
-    lines.append("-" * 40)
+    lines.append(f"{'Market':<8} {'Buy':>7} {'Sell':>7}")
+    lines.append("-" * 24)
     for name, (buy, sell) in rows.items():
-        lines.append(f"{name:<10}| {fmt(buy):>12} | {fmt(sell):>12}")
+        lines.append(f"{name:<8} {fmt(buy):>7} {fmt(sell):>7}")
     lines.append("```")
-    lines.append(f"🕒 Update: {now}")
+    lines.append(f"🕒 {now}")
     return "\n".join(lines)
 
 
@@ -162,9 +190,10 @@ def main():
     rows = {
         "Wallex": fetch_wallex(),
         "Nobitex": fetch_nobitex(),
-        "AbanTether": fetch_abantether(),
+        "AbanTeth": fetch_abantether(),
         "Bitpin": fetch_bitpin(),
         "Tabdeal": fetch_tabdeal(),
+        "Ramzinex": fetch_ramzinex(),
     }
     message = build_message(rows)
     log.info("\n%s", message)
