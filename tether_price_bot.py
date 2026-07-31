@@ -137,9 +137,9 @@ def fetch_ramzinex():
         for p in pairs:
             if not isinstance(p, dict):
                 continue
-            # جستجو در تمام مقادیر رشته‌ای دیکشنری برای usdt و tmn/toman/irt
-            values_str = " ".join(str(v).lower() for v in p.values())
-            if "usdt" in values_str and ("tmn" in values_str or "toman" in values_str or "irt" in values_str or "-2" in values_str):
+            base_sym = str(p.get("base_currency_symbol", {}).get("en", "")).lower()
+            quote_sym = str(p.get("quote_currency_symbol", {}).get("en", "")).lower()
+            if base_sym == "usdt" and quote_sym in ("irr", "rial", "irt", "toman"):
                 usdt_pair = p
                 break
 
@@ -149,8 +149,9 @@ def fetch_ramzinex():
 
         log.info("Ramzinex matched pair (for verification): %s", usdt_pair)
 
-        buy_price = round(float(usdt_pair["sell"]))
-        sell_price = round(float(usdt_pair["buy"]))
+        # قیمت‌ها در رمزینکس برای جفت‌ارز به ریال هستند (مثل نوبیتکس) - تبدیل به تومان
+        buy_price = round(float(usdt_pair["sell"]) / 10)
+        sell_price = round(float(usdt_pair["buy"]) / 10)
         return buy_price, sell_price
     except Exception as e:
         log.warning("Ramzinex fetch failed: %s", e)
